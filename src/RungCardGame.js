@@ -192,7 +192,7 @@ export default function RungCardGame() {
   return (
     <Box sx={{ p: 4 }}>
       <Typography variant="h4" gutterBottom>
-        8-Player Rung Card Game (2 Teams)
+        8-Player Rung Card Game
       </Typography>
 
       {!gameStarted ? (
