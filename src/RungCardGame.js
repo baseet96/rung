@@ -37,7 +37,7 @@ const generateDeck = (playersCount) => {
   }
 
   if (playersCount === 8) {
-    return shuffle([...deck, ...deck]);
+    return shuffle([...deck, ...deck]); // Double deck for 8 players
   }
 
   return shuffle(deck);
@@ -190,7 +190,9 @@ export default function RungCardGame() {
       const updatedTeamScores = [...teamScores];
       const updatedTrickCount = trickCount + 1;
 
-      updatedTeamScores[teamIndex] += 1;
+      if (updatedTrickCount >= 3) {
+        updatedTeamScores[teamIndex] += 1;
+      }
 
       const isGameOver =
         updatedTeamScores[0] >= WINNING_TRICKS ||
@@ -213,7 +215,7 @@ export default function RungCardGame() {
   return (
     <Box sx={{ p: 4 }}>
       <Typography variant="h3" align="center" gutterBottom fontWeight={600}>
-        🃏 Rung Card Game 🃏
+        Rung Card Game
       </Typography>
 
       {!gameStarted ? (
@@ -238,7 +240,7 @@ export default function RungCardGame() {
             </Button>
           </Box>
           <Button variant="contained" size="large" onClick={startGame}>
-            🎲 Deal Cards
+            Deal Cards
           </Button>
         </Box>
       ) : !trumpChosen ? (
