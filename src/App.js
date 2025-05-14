@@ -1,5 +1,4 @@
-import React from "react";
-import RungCardGame from "./RungCardGame"; // adjust path if needed
+import RungCardGame from "./RungCardGame";
 
 function App() {
   return (

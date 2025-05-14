@@ -3,8 +3,8 @@ import {
   Button,
   Paper,
   Typography,
-  Grid,
   Box,
+  Grid,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -28,13 +28,18 @@ const values = [
   "A",
 ];
 
-const generateDeck = () => {
+const generateDeck = (playersCount) => {
   const deck = [];
   for (let suit of suits) {
     for (let value of values) {
       deck.push({ suit, value });
     }
   }
+
+  if (playersCount === 8) {
+    return shuffle([...deck, ...deck]);
+  }
+
   return shuffle(deck);
 };
 
@@ -58,27 +63,32 @@ const dealCards = (deck, playersCount) => {
 
 const getCardValue = (card) => values.indexOf(card.value);
 
-const Card = ({ card }) => (
-  <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
-    <Paper
-      elevation={3}
-      sx={{
-        width: 40,
-        height: 56,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        m: 0.5,
-        fontSize: 14,
-        fontWeight: "bold",
-        bgcolor: "#fffbe6",
-      }}
-    >
-      {card.value}
-      {card.suit}
-    </Paper>
-  </motion.div>
-);
+const Card = ({ card }) => {
+  const isRed = card.suit === "♥" || card.suit === "♦";
+
+  return (
+    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+      <Paper
+        elevation={3}
+        sx={{
+          width: 40,
+          height: 56,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          m: 0.5,
+          fontSize: 14,
+          fontWeight: "bold",
+          bgcolor: "#fffbe6",
+          color: isRed ? "red" : "black",
+        }}
+      >
+        {card.value}
+        {card.suit}
+      </Paper>
+    </motion.div>
+  );
+};
 
 const PlayerHand = ({ player, index, isActive, onPlayCard, trickLeadSuit }) => (
   <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
@@ -119,12 +129,17 @@ export default function RungCardGame() {
   const [trumpSuit, setTrumpSuit] = useState(null);
   const [trumpChosen, setTrumpChosen] = useState(false);
   const [gameOver, setGameOver] = useState(false);
+  const [playersCount, setPlayersCount] = useState(4);
+  const [player1Cards, setPlayer1Cards] = useState([]);
+  const [showPlayer1Cards, setShowPlayer1Cards] = useState(false);
+  const [trickCount, setTrickCount] = useState(0);
   const WINNING_TRICKS = 13;
 
   const startGame = () => {
-    const deck = generateDeck();
-    const dealt = dealCards(deck, 8);
+    const deck = generateDeck(playersCount);
+    const dealt = dealCards(deck, playersCount);
     setPlayers(dealt);
+    setPlayer1Cards(dealt[0].slice(0, 5));
     setCurrentTurn(0);
     setPlayedCards([]);
     setGameStarted(true);
@@ -134,11 +149,14 @@ export default function RungCardGame() {
     setTrumpSuit(null);
     setTrumpChosen(false);
     setGameOver(false);
+    setShowPlayer1Cards(true);
+    setTrickCount(0);
   };
 
   const chooseTrump = (suit) => {
     setTrumpSuit(suit);
     setTrumpChosen(true);
+    setShowPlayer1Cards(false);
   };
 
   const onPlayCard = (playerIndex, cardIndex) => {
@@ -155,8 +173,8 @@ export default function RungCardGame() {
     setPlayers(newPlayers);
     setPlayedCards(newPlayedCards);
 
-    if (newPlayedCards.length < 8) {
-      setCurrentTurn((prev) => (prev + 1) % 8);
+    if (newPlayedCards.length < playersCount) {
+      setCurrentTurn((prev) => (prev + 1) % playersCount);
     } else {
       const trumps = newPlayedCards.filter((pc) => pc.card.suit === trumpSuit);
       const validCards =
@@ -170,6 +188,8 @@ export default function RungCardGame() {
       const winnerIndex = winningCard.playerIndex;
       const teamIndex = winnerIndex % 2;
       const updatedTeamScores = [...teamScores];
+      const updatedTrickCount = trickCount + 1;
+
       updatedTeamScores[teamIndex] += 1;
 
       const isGameOver =
@@ -179,6 +199,7 @@ export default function RungCardGame() {
       setTeamScores(updatedTeamScores);
       setTrickWinner(winnerIndex);
       setGameOver(isGameOver);
+      setTrickCount(updatedTrickCount);
 
       setTimeout(() => {
         setPlayedCards([]);
@@ -191,18 +212,50 @@ export default function RungCardGame() {
 
   return (
     <Box sx={{ p: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        8-Player Rung Card Game
+      <Typography variant="h3" align="center" gutterBottom fontWeight={600}>
+        🃏 Rung Card Game 🃏
       </Typography>
 
       {!gameStarted ? (
-        <Button variant="contained" onClick={startGame}>
-          Deal Cards
-        </Button>
+        <Box textAlign="center" mt={5}>
+          <Typography variant="h6" gutterBottom>
+            Select Number of Players:
+          </Typography>
+          <Box mb={2}>
+            <Button
+              variant={playersCount === 4 ? "contained" : "outlined"}
+              onClick={() => setPlayersCount(4)}
+              sx={{ mr: 2, minWidth: 120 }}
+            >
+              4 Players
+            </Button>
+            <Button
+              variant={playersCount === 8 ? "contained" : "outlined"}
+              onClick={() => setPlayersCount(8)}
+              sx={{ minWidth: 120 }}
+            >
+              8 Players
+            </Button>
+          </Box>
+          <Button variant="contained" size="large" onClick={startGame}>
+            🎲 Deal Cards
+          </Button>
+        </Box>
       ) : !trumpChosen ? (
         <Dialog open={!trumpChosen}>
-          <DialogTitle>Choose Trump Suit (Player 1)</DialogTitle>
+          <DialogTitle>Player 1: Choose Trump Suit</DialogTitle>
           <DialogContent>
+            {showPlayer1Cards && (
+              <Box mb={2}>
+                <Typography variant="h6">Your Cards (Player 1):</Typography>
+                <Box display="flex" gap={1}>
+                  {player1Cards.map((card, index) => (
+                    <Card key={index} card={card} />
+                  ))}
+                </Box>
+              </Box>
+            )}
+            <Typography variant="h6">Choose Trump Suit:</Typography>
             <Box display="flex" gap={2} p={1}>
               {suits.map((suit) => (
                 <Button
@@ -219,71 +272,46 @@ export default function RungCardGame() {
         </Dialog>
       ) : (
         <Box>
-          <Typography variant="h6" gutterBottom>
-            Current Turn: Player {currentTurn + 1}
+          <Typography variant="h6">Trump Suit: {trumpSuit}</Typography>
+          <Typography variant="h6" color="secondary">
+            Team 1 Score: {teamScores[0]} | Team 2 Score: {teamScores[1]}
           </Typography>
 
-          {trickWinner !== null && (
-            <Typography color="success.main" sx={{ fontWeight: "bold", mb: 1 }}>
-              Player {trickWinner + 1} wins the trick!
-            </Typography>
+          {players.map((player, index) => (
+            <PlayerHand
+              key={index}
+              player={player}
+              index={index}
+              isActive={index === currentTurn}
+              onPlayCard={onPlayCard}
+              trickLeadSuit={trickLeadSuit}
+            />
+          ))}
+
+          {playedCards.length > 0 && (
+            <Paper sx={{ p: 2, mt: 2 }} elevation={4}>
+              <Typography variant="h6">Current Trick:</Typography>
+              <Grid container spacing={2}>
+                {playedCards.map((pc, i) => (
+                  <Grid item key={i}>
+                    <Typography>Player {pc.playerIndex + 1}</Typography>
+                    <Card card={pc.card} />
+                  </Grid>
+                ))}
+              </Grid>
+              {trickWinner !== null && (
+                <Typography variant="h6" color="primary">
+                  Trick won by Player {trickWinner + 1}
+                </Typography>
+              )}
+            </Paper>
           )}
 
           {gameOver && (
-            <Typography
-              color="error.main"
-              sx={{ fontWeight: "bold", fontSize: 20, mb: 2 }}
-            >
-              Game Over! {teamScores[0] > teamScores[1] ? "Team A" : "Team B"}{" "}
-              wins!
+            <Typography variant="h4" color="primary" mt={3}>
+              Game Over! Team {teamScores[0] > teamScores[1] ? 1 : 2} Wins!
             </Typography>
           )}
-
-          <Grid container spacing={2}>
-            {players.map((player, index) => (
-              <Grid item xs={12} sm={6} md={6} key={index}>
-                <PlayerHand
-                  player={player}
-                  index={index}
-                  isActive={
-                    index === currentTurn && trickWinner === null && !gameOver
-                  }
-                  onPlayCard={onPlayCard}
-                  trickLeadSuit={trickLeadSuit}
-                />
-              </Grid>
-            ))}
-          </Grid>
-
-          <Box mt={4}>
-            <Typography variant="h6">Played Cards:</Typography>
-            <Box display="flex" flexWrap="wrap" mt={1}>
-              {playedCards.map((entry, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Paper sx={{ p: 1, m: 1 }}>
-                    Player {entry.playerIndex + 1}: {entry.card.value}
-                    {entry.card.suit}
-                  </Paper>
-                </motion.div>
-              ))}
-            </Box>
-          </Box>
-
-          <Box mt={4}>
-            <Typography variant="h6">Team Scores:</Typography>
-            <ul>
-              <li>Team A (Players 1, 3, 5, 7): {teamScores[0]} trick(s)</li>
-              <li>Team B (Players 2, 4, 6, 8): {teamScores[1]} trick(s)</li>
-            </ul>
-            {trumpSuit && (
-              <Typography mt={1}>Trump Suit: {trumpSuit}</Typography>
-            )}
-          </Box>
         </Box>
       )}
     </Box>
