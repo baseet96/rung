@@ -1,4 +1,15 @@
 import React, { useState } from "react";
+import {
+  Button,
+  Paper,
+  Typography,
+  Grid,
+  Box,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+} from "@mui/material";
+import { motion } from "motion/react";
 
 const suits = ["♠", "♥", "♦", "♣"];
 const values = [
@@ -45,42 +56,57 @@ const dealCards = (deck, playersCount) => {
   return players;
 };
 
+const getCardValue = (card) => values.indexOf(card.value);
+
 const Card = ({ card }) => (
-  <div className="w-10 h-14 border rounded bg-white text-center text-sm flex items-center justify-center m-1">
-    {card.value}
-    {card.suit}
-  </div>
+  <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+    <Paper
+      elevation={3}
+      sx={{
+        width: 40,
+        height: 56,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        m: 0.5,
+        fontSize: 14,
+        fontWeight: "bold",
+        bgcolor: "#fffbe6",
+      }}
+    >
+      {card.value}
+      {card.suit}
+    </Paper>
+  </motion.div>
 );
 
 const PlayerHand = ({ player, index, isActive, onPlayCard, trickLeadSuit }) => (
-  <div className="border p-2 m-2">
-    <h2 className={isActive ? "font-bold text-blue-600" : ""}>
+  <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
+    <Typography variant="h6" color={isActive ? "primary" : "textSecondary"}>
       Player {index + 1} {isActive ? "(Your Turn)" : ""}
-    </h2>
-    <div className="flex flex-wrap">
+    </Typography>
+    <Box display="flex" flexWrap="wrap">
       {player.map((card, i) => {
         const mustFollowSuit =
           trickLeadSuit && player.some((c) => c.suit === trickLeadSuit);
-        const canPlay = !isActive
-          ? false
-          : !mustFollowSuit || card.suit === trickLeadSuit;
+        const canPlay =
+          isActive && (!mustFollowSuit || card.suit === trickLeadSuit);
         return (
-          <button
+          <Box
             key={i}
-            className="w-10 h-14 border rounded bg-white text-center text-sm flex items-center justify-center m-1 disabled:opacity-30"
-            disabled={!canPlay}
-            onClick={() => onPlayCard(index, i)}
+            onClick={() => canPlay && onPlayCard(index, i)}
+            sx={{
+              opacity: canPlay ? 1 : 0.3,
+              cursor: canPlay ? "pointer" : "not-allowed",
+            }}
           >
-            {card.value}
-            {card.suit}
-          </button>
+            <Card card={card} />
+          </Box>
         );
       })}
-    </div>
-  </div>
+    </Box>
+  </Paper>
 );
-
-const getCardValue = (card) => values.indexOf(card.value);
 
 export default function RungCardGame() {
   const [players, setPlayers] = useState([]);
@@ -88,10 +114,12 @@ export default function RungCardGame() {
   const [playedCards, setPlayedCards] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
   const [trickWinner, setTrickWinner] = useState(null);
-  const [teamScores, setTeamScores] = useState(Array(2).fill(0));
+  const [teamScores, setTeamScores] = useState([0, 0]);
   const [trickLeadSuit, setTrickLeadSuit] = useState(null);
   const [trumpSuit, setTrumpSuit] = useState(null);
   const [trumpChosen, setTrumpChosen] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
+  const WINNING_TRICKS = 13;
 
   const startGame = () => {
     const deck = generateDeck();
@@ -101,10 +129,11 @@ export default function RungCardGame() {
     setPlayedCards([]);
     setGameStarted(true);
     setTrickWinner(null);
-    setTeamScores(Array(2).fill(0));
+    setTeamScores([0, 0]);
     setTrickLeadSuit(null);
     setTrumpSuit(null);
     setTrumpChosen(false);
+    setGameOver(false);
   };
 
   const chooseTrump = (suit) => {
@@ -113,7 +142,7 @@ export default function RungCardGame() {
   };
 
   const onPlayCard = (playerIndex, cardIndex) => {
-    if (playerIndex !== currentTurn || !trumpChosen) return;
+    if (playerIndex !== currentTurn || !trumpChosen || gameOver) return;
 
     const newPlayers = [...players];
     const playedCard = newPlayers[playerIndex].splice(cardIndex, 1)[0];
@@ -134,17 +163,22 @@ export default function RungCardGame() {
         trumps.length > 0
           ? trumps
           : newPlayedCards.filter((pc) => pc.card.suit === trickLeadSuit);
-      const winningCard = validCards.reduce((prev, curr) => {
-        return getCardValue(curr.card) > getCardValue(prev.card) ? curr : prev;
-      });
+      const winningCard = validCards.reduce((prev, curr) =>
+        getCardValue(curr.card) > getCardValue(prev.card) ? curr : prev
+      );
 
       const winnerIndex = winningCard.playerIndex;
       const teamIndex = winnerIndex % 2;
       const updatedTeamScores = [...teamScores];
       updatedTeamScores[teamIndex] += 1;
 
+      const isGameOver =
+        updatedTeamScores[0] >= WINNING_TRICKS ||
+        updatedTeamScores[1] >= WINNING_TRICKS;
+
       setTeamScores(updatedTeamScores);
       setTrickWinner(winnerIndex);
+      setGameOver(isGameOver);
 
       setTimeout(() => {
         setPlayedCards([]);
@@ -156,76 +190,102 @@ export default function RungCardGame() {
   };
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl mb-4">8-Player Rung Card Game (2 Teams)</h1>
+    <Box sx={{ p: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        8-Player Rung Card Game (2 Teams)
+      </Typography>
+
       {!gameStarted ? (
-        <button
-          onClick={startGame}
-          className="bg-blue-500 text-white px-4 py-2 rounded"
-        >
+        <Button variant="contained" onClick={startGame}>
           Deal Cards
-        </button>
+        </Button>
       ) : !trumpChosen ? (
-        <div className="mb-4">
-          <h2 className="text-lg mb-2">Choose Trump Suit (Player 1):</h2>
-          <div className="flex space-x-2">
-            {suits.map((suit) => (
-              <button
-                key={suit}
-                onClick={() => chooseTrump(suit)}
-                className="bg-green-500 text-white px-3 py-1 rounded"
-              >
-                {suit}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div>
-          <h2 className="text-xl mb-2">
-            Current Turn: Player {currentTurn + 1}
-          </h2>
-          {trickWinner !== null && (
-            <div className="text-green-600 font-semibold mb-2">
-              Player {trickWinner + 1} wins the trick!
-            </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 mt-4">
-            {players.map((player, index) => (
-              <PlayerHand
-                key={index}
-                player={player}
-                index={index}
-                isActive={index === currentTurn && trickWinner === null}
-                onPlayCard={onPlayCard}
-                trickLeadSuit={trickLeadSuit}
-              />
-            ))}
-          </div>
-          <div className="mt-6">
-            <h3 className="text-lg">Played Cards:</h3>
-            <div className="flex flex-wrap">
-              {playedCards.map((entry, i) => (
-                <div
-                  key={i}
-                  className="border p-2 m-1 bg-gray-100 rounded text-sm"
+        <Dialog open={!trumpChosen}>
+          <DialogTitle>Choose Trump Suit (Player 1)</DialogTitle>
+          <DialogContent>
+            <Box display="flex" gap={2} p={1}>
+              {suits.map((suit) => (
+                <Button
+                  key={suit}
+                  variant="contained"
+                  color="success"
+                  onClick={() => chooseTrump(suit)}
                 >
-                  Player {entry.playerIndex + 1}: {entry.card.value}
-                  {entry.card.suit}
-                </div>
+                  {suit}
+                </Button>
               ))}
-            </div>
-          </div>
-          <div className="mt-6">
-            <h3 className="text-lg">Team Scores:</h3>
-            <ul className="list-disc ml-6">
+            </Box>
+          </DialogContent>
+        </Dialog>
+      ) : (
+        <Box>
+          <Typography variant="h6" gutterBottom>
+            Current Turn: Player {currentTurn + 1}
+          </Typography>
+
+          {trickWinner !== null && (
+            <Typography color="success.main" sx={{ fontWeight: "bold", mb: 1 }}>
+              Player {trickWinner + 1} wins the trick!
+            </Typography>
+          )}
+
+          {gameOver && (
+            <Typography
+              color="error.main"
+              sx={{ fontWeight: "bold", fontSize: 20, mb: 2 }}
+            >
+              Game Over! {teamScores[0] > teamScores[1] ? "Team A" : "Team B"}{" "}
+              wins!
+            </Typography>
+          )}
+
+          <Grid container spacing={2}>
+            {players.map((player, index) => (
+              <Grid item xs={12} sm={6} md={6} key={index}>
+                <PlayerHand
+                  player={player}
+                  index={index}
+                  isActive={
+                    index === currentTurn && trickWinner === null && !gameOver
+                  }
+                  onPlayCard={onPlayCard}
+                  trickLeadSuit={trickLeadSuit}
+                />
+              </Grid>
+            ))}
+          </Grid>
+
+          <Box mt={4}>
+            <Typography variant="h6">Played Cards:</Typography>
+            <Box display="flex" flexWrap="wrap" mt={1}>
+              {playedCards.map((entry, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Paper sx={{ p: 1, m: 1 }}>
+                    Player {entry.playerIndex + 1}: {entry.card.value}
+                    {entry.card.suit}
+                  </Paper>
+                </motion.div>
+              ))}
+            </Box>
+          </Box>
+
+          <Box mt={4}>
+            <Typography variant="h6">Team Scores:</Typography>
+            <ul>
               <li>Team A (Players 1, 3, 5, 7): {teamScores[0]} trick(s)</li>
               <li>Team B (Players 2, 4, 6, 8): {teamScores[1]} trick(s)</li>
             </ul>
-            {trumpSuit && <p className="mt-2">Trump Suit: {trumpSuit}</p>}
-          </div>
-        </div>
+            {trumpSuit && (
+              <Typography mt={1}>Trump Suit: {trumpSuit}</Typography>
+            )}
+          </Box>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 }
