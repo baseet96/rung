@@ -44,81 +44,127 @@ const RungCardGame = () => {
   };
 
   useEffect(() => {
-    if (trickWinner !== null) {
-      setShowTrickDialog(true);
+    if (trickWinner === null) return;
 
-      setTimeout(() => {
-        setShowTrickDialog(false);
-        setPlayedCards([]);
-        setCurrentTurn(trickWinner);
+    setShowTrickDialog(true);
 
-        const currentCard = playedCards.find(
-          (pc) => pc.playerIndex === trickWinner
-        )?.card;
+    const currentCard = playedCards.find(
+      (pc) => pc.playerIndex === trickWinner
+    )?.card;
 
-        if (gameRule === "single") {
-          const teamIndex = trickWinner % 2;
-          const updatedScores = [...scores];
-          updatedScores[teamIndex] += 1;
-          setScores(updatedScores);
-          setPreviousTrickWinner(null);
-          setPreviousTrickCard(null);
-          setControlPlayer(null);
-          setNoScoreTrickCount(0);
-        } else if (gameRule === "double" || gameRule === "double-ace") {
+    setTimeout(() => {
+      setShowTrickDialog(false);
+      setPlayedCards([]);
+      setCurrentTurn(trickWinner);
+
+      if (gameRule === "single") {
+        // Simple: add 1 point to the winning player's team
+        const teamIndex = trickWinner % 2;
+        setScores((prevScores) => {
+          const newScores = [...prevScores];
+          newScores[teamIndex] += 1;
+          return newScores;
+        });
+
+        // Reset control states
+        setPreviousTrickWinner(null);
+        setPreviousTrickCard(null);
+        setControlPlayer(null);
+        setNoScoreTrickCount(0);
+      } else if (gameRule === "double" || gameRule === "double-ace") {
+        // Complex scoring logic:
+        setScores((prevScores) => {
+          let newScores = [...prevScores];
+          let newControlPlayer = controlPlayer;
+          let newPreviousTrickWinner = previousTrickWinner;
+          let newPreviousTrickCard = previousTrickCard;
+          let newNoScoreTrickCount = noScoreTrickCount;
+
           let scoreOccurred = false;
 
-          if (controlPlayer === null) {
-            if (previousTrickWinner === trickWinner) {
+          if (newControlPlayer === null) {
+            if (newPreviousTrickWinner === trickWinner) {
+              // Same player/team won last and current trick
+
               if (
                 gameRule === "double-ace" &&
-                isAce(previousTrickCard) &&
+                isAce(newPreviousTrickCard) &&
                 isAce(currentCard)
               ) {
-                console.log("Double Ace trick invalid – control not gained.");
+                // Double Ace invalid control
+                // No score changes, just reset control states
+                scoreOccurred = false;
               } else {
-                setControlPlayer(trickWinner);
+                // Control gained: add noScoreTrickCount + 2 points
+                newControlPlayer = trickWinner;
                 const teamIndex = trickWinner % 2;
-                const updatedScores = [...scores];
-                updatedScores[teamIndex] += 2;
-                setScores(updatedScores);
+                newScores[teamIndex] += newNoScoreTrickCount + 2;
+                newNoScoreTrickCount = 0;
                 scoreOccurred = true;
+              }
+            } else {
+              // Different winner from last trick - no control gained yet
+              newPreviousTrickWinner = trickWinner;
+              newPreviousTrickCard = currentCard;
+
+              // Increase noScoreTrickCount only if previous winner was set and different
+              if (
+                previousTrickWinner !== null &&
+                previousTrickWinner !== trickWinner
+              ) {
+                newNoScoreTrickCount += 1;
               }
             }
           } else {
-            if (trickWinner === controlPlayer) {
+            // controlPlayer !== null
+
+            if (trickWinner === newControlPlayer) {
+              // Control player won again, +1 point
               const teamIndex = trickWinner % 2;
-              const updatedScores = [...scores];
-              updatedScores[teamIndex] += 1;
-              setScores(updatedScores);
+              newScores[teamIndex] += 1;
+              newNoScoreTrickCount = 0;
               scoreOccurred = true;
             } else {
-              setControlPlayer(null);
+              // Control lost, reset control player and increase noScoreTrickCount
+              newControlPlayer = null;
+              newNoScoreTrickCount += 1;
             }
+
+            newPreviousTrickWinner = trickWinner;
+            newPreviousTrickCard = currentCard;
           }
 
-          if (scoreOccurred) {
-            setNoScoreTrickCount(0);
-          } else {
-            const updatedCount = noScoreTrickCount + 1;
-            setNoScoreTrickCount(updatedCount);
-
-            if (updatedCount >= 6) {
+          if (!scoreOccurred) {
+            // If no score happened this trick, check if noScoreTrickCount hits 6 or more
+            if (newNoScoreTrickCount >= 6) {
+              // Award points and reset states
               const teamIndex = trickWinner % 2;
-              const updatedScores = [...scores];
-              updatedScores[teamIndex] += updatedCount + 1;
-              setScores(updatedScores);
-              setNoScoreTrickCount(0);
+              newScores[teamIndex] += newNoScoreTrickCount + 1;
+              newNoScoreTrickCount = 0;
+              newPreviousTrickWinner = null;
+              newPreviousTrickCard = null;
+              newControlPlayer = null;
             }
+          } else {
+            // If score occurred, reset previous trick info and noScoreTrickCount
+            newPreviousTrickWinner = null;
+            newPreviousTrickCard = null;
+            newControlPlayer = null;
+            newNoScoreTrickCount = 0;
           }
 
-          setPreviousTrickWinner(trickWinner);
-          setPreviousTrickCard(currentCard);
-        }
+          // Apply all updated states
+          setControlPlayer(newControlPlayer);
+          setPreviousTrickWinner(newPreviousTrickWinner);
+          setPreviousTrickCard(newPreviousTrickCard);
+          setNoScoreTrickCount(newNoScoreTrickCount);
 
-        setTrickWinner(null);
-      }, 2000);
-    }
+          return newScores;
+        });
+      }
+
+      setTrickWinner(null);
+    }, 2000);
   }, [trickWinner]);
 
   const handlePlayCard = (playerIndex, cardIndex) => {
@@ -132,10 +178,23 @@ const RungCardGame = () => {
 
     if (newPlayedCards.length === playersCount) {
       const leadSuit = newPlayedCards[0].card.suit;
-      const filtered = newPlayedCards.filter((pc) => pc.card.suit === leadSuit);
-      const winner = filtered.reduce((best, pc) => {
-        return getCardValue(pc.card) > getCardValue(best.card) ? pc : best;
-      });
+      let trumpCards = newPlayedCards.filter(
+        (pc) => pc.card.suit === trumpSuit
+      );
+      let winner;
+
+      if (trumpCards.length > 0) {
+        winner = trumpCards.reduce((best, pc) =>
+          getCardValue(pc.card) > getCardValue(best.card) ? pc : best
+        );
+      } else {
+        const sameSuitCards = newPlayedCards.filter(
+          (pc) => pc.card.suit === leadSuit
+        );
+        winner = sameSuitCards.reduce((best, pc) =>
+          getCardValue(pc.card) > getCardValue(best.card) ? pc : best
+        );
+      }
 
       setTrickWinner(winner.playerIndex);
     } else {
