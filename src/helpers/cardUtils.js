@@ -44,3 +44,7 @@ export const dealCards = (deck, playersCount) => {
   }
   return players;
 };
+
+export const isAce = (card) => {
+  return card?.value === "A";
+};
